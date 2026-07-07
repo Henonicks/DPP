@@ -231,46 +231,42 @@ void cluster::start(start_type return_after) {
 				if (now >= shard_reconnect_time) {
 					/* This shard needs to be reconnected */
 					reconnections.erase(reconnect);
-					discord_client* old = nullptr;
+					discord_client * cl_old = nullptr;
+					discord_client * cl_new = nullptr;
 					{
 						std::shared_lock lk(shards_mutex);
-						old = shards[shard_id];
+						cl_old = shards[shard_id];
 					}
-					/* These values must be copied to the new connection
-					 * to attempt to resume it
-					 */
-					auto seq_no = old->last_seq;
-					auto session_id = old->sessionid;
 					log(ll_info, "Reconnecting shard " + std::to_string(shard_id));
 					/* Make a new resumed connection based off the old one */
 					try {
-						std::unique_lock lk(shards_mutex);
-						if (shards[shard_id] != nullptr) {
+						if (cl_old != nullptr) {
 							log(ll_trace, "Attempting resume...");
-							shards[shard_id] = nullptr;
-							shards[shard_id] = new discord_client(*old, seq_no, session_id);
+							cl_new = new discord_client(*cl_old);
 						} else {
 							log(ll_trace, "Attempting full reconnection...");
-							shards[shard_id] = nullptr;
-							shards[shard_id] = new discord_client(this, shard_id, numshards, token, intents, compressed, ws_mode);
+							cl_new = new discord_client(this, shard_id, numshards, token, intents, compressed, ws_mode);
 						}
-						/* Delete the old one */
-						log(ll_trace, "Attempting to delete old connection...");
-						delete old;
-						old = nullptr;
 						/* Set up the new shard's IO events */
 						log(ll_trace, "Running new connection...");
-						shards[shard_id]->run();
+						cl_new->run();
 					}
 					catch (const std::exception& e) {
 						std::unique_lock lk(shards_mutex);
 						log(ll_info, "Exception when reconnecting shard " + std::to_string(shard_id) + ": " + std::string(e.what()));
-						delete shards[shard_id];
-						delete old;
-						old = nullptr;
-						shards[shard_id] = nullptr;
 						add_reconnect(shard_id);
 					}
+					/* Delete the old one */
+					if (cl_old != nullptr) {
+						log(ll_trace, "Deleting old connection...");
+						std::unique_lock lk(shards_mutex);
+						shards[shard_id] = nullptr;
+						delete cl_old;
+						cl_old = nullptr;
+					}
+					log(ll_trace, "Installing new connection...");
+					std::unique_lock lk(shards_mutex);
+					shards[shard_id] = cl_new;
 					/* It is not possible to reconnect another shard within the same 5-second window,
 					 * due to discords strict rate limiting on shard connections, so we bail out here
 					 * and only try another reconnect in the next timer interval. Do not try and make
