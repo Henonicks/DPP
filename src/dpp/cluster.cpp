@@ -256,12 +256,13 @@ void cluster::start(start_type return_after) {
 						std::unique_lock lk(shards_mutex);
 						log(ll_info, "Exception when reconnecting shard " + std::to_string(shard_id) + ": " + std::string(e.what()));
 						add_reconnect(shard_id);
+						shards[shard_id] = std::move(cl_old);
+						return;
 					}
 					/* Delete the old one */
 					if (cl_old != nullptr) {
 						log(ll_trace, "Deleting old connection...");
 						std::unique_lock lk(shards_mutex);
-						shards[shard_id] = nullptr;
 						cl_old = nullptr;
 					}
 					log(ll_trace, "Installing new connection...");
