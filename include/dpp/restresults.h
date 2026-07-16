@@ -50,7 +50,7 @@ namespace dpp {
 /**
  * @brief A list of shards
  */
-typedef std::map<uint32_t, class discord_client*> shard_list;
+typedef std::map<uint32_t, std::unique_ptr<class discord_client>> shard_list;
 
 /**
  * @brief List of shards awaiting reconnection, by id with earliest possible reconnect time
@@ -196,7 +196,8 @@ typedef std::variant<
 		entitlement,
 		entitlement_map,
 		sku,
-		sku_map
+		sku_map,
+		message_search_result
 	> confirmable_t;
 
 /**

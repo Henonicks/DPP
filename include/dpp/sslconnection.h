@@ -143,6 +143,14 @@ protected:
 	openssl_connection* ssl;
 
 	/**
+	 * @brief Protects openssl opaque contexts when closing
+	 *
+	 * There's data races when reconnecting severed connection.
+	 * This makes sure we don't double free our contexts.
+	 */
+	std::mutex ssl_close_mutex;
+
+	/**
 	 * @brief SSL cipher in use
 	 */
 	std::string cipher;
@@ -263,7 +271,7 @@ public:
 	void enable_raw_tracing();
 
 	/**
-	 * @brief Get the bytes out objectGet total bytes sent
+	 * @brief Get total bytes sent
 	 * @return uint64_t bytes sent
 	 */
 	uint64_t get_bytes_out();
